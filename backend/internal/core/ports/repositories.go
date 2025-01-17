@@ -17,6 +17,6 @@ type ChatRepository interface {
 }
 
 type AIModelService interface {
-	SendMessage(ctx context.Context, message *domain.Message) (*domain.Message, error)
+	SendMessage(ctx context.Context, message *domain.Message, history []*domain.Message) (*domain.Message, error)
 	ListAvailableModels(ctx context.Context) ([]string, error)
 }

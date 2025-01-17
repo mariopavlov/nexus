@@ -29,10 +29,15 @@ type SendMessageRequest struct {
 	Model   string `json:"model" binding:"required"`
 }
 
+type UpdateChatRequest struct {
+	Title string `json:"title" binding:"required"`
+}
+
 func (h *ChatHandler) RegisterRoutes(r *gin.Engine) {
 	r.POST("/chats", h.CreateChat)
 	r.GET("/chats", h.ListChats)
 	r.GET("/chats/:id", h.GetChat)
+	r.PUT("/chats/:id", h.UpdateChat)
 	r.DELETE("/chats/:id", h.DeleteChat)
 	r.POST("/chats/:id/messages", h.SendMessage)
 	r.GET("/chats/:id/messages", h.GetMessages)
@@ -101,6 +106,28 @@ func (h *ChatHandler) DeleteChat(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (h *ChatHandler) UpdateChat(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		return
+	}
+
+	var req UpdateChatRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	chat, err := h.chatUseCase.UpdateChat(c.Request.Context(), domain.ChatID(id), req.Title)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, chat)
 }
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {

@@ -11,10 +11,12 @@ export default function Home() {
     chats: [],
     currentChatId: null,
     isLoading: false,
-    selectedModel: 'llama2',
+    selectedModel: '',
   });
   const [input, setInput] = useState('');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const getCurrentChat = () => {
@@ -89,10 +91,10 @@ export default function Home() {
           ...prev,
           chats: chats,
           currentChatId: chats?.length > 0 ? chats[0].id : null,
+          selectedModel: models?.[0] || '',
         }));
         if (Array.isArray(models) && models.length > 0) {
           setAvailableModels(models);
-          setChatState(prev => ({ ...prev, selectedModel: models[0] }));
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -120,11 +122,21 @@ export default function Home() {
     }
   };
 
-  const handleChatSelect = (chatId: string) => {
-    setChatState(prev => ({
-      ...prev,
-      currentChatId: chatId,
-    }));
+  const handleChatSelect = async (chatId: string) => {
+    try {
+      console.log('Selecting chat:', chatId);
+      const chat = await api.getChat(chatId);
+      
+      setChatState(prev => ({
+        ...prev,
+        currentChatId: chatId,
+        chats: prev.chats.map(c => 
+          c.id === chatId ? chat : c
+        ),
+      }));
+    } catch (error) {
+      console.error('Error loading chat:', error);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,6 +172,34 @@ export default function Home() {
     }
   };
 
+  const handleEditTitle = async () => {
+    if (!chatState.currentChatId || !newTitle.trim()) return;
+    
+    try {
+      console.log('Starting title update:', { chatId: chatState.currentChatId, newTitle });
+      const updatedChat = await api.updateChatTitle(chatState.currentChatId, newTitle.trim());
+      console.log('Title update successful:', updatedChat);
+      
+      setChatState(prev => ({
+        ...prev,
+        chats: prev.chats.map(chat =>
+          chat.id === prev.currentChatId 
+            ? { ...chat, title: newTitle.trim() }
+            : chat
+        ),
+      }));
+      setEditingTitle(false);
+    } catch (error) {
+      console.error('Error updating chat title:', {
+        error,
+        message: error.message,
+        type: error.constructor.name,
+      });
+      // Keep the edit mode active on error
+      alert('Failed to update chat title. Please try again.');
+    }
+  };
+
   return (
     <div className="flex h-screen max-h-screen bg-gray-50">
       <ChatSidebar
@@ -172,14 +212,59 @@ export default function Home() {
       <div className="flex-1 flex flex-col">
         <header className="p-4 bg-white border-b border-gray-200">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-semibold text-gray-900">Chat with AI</h1>
+            <div className="flex items-center gap-2">
+              {editingTitle ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleEditTitle}
+                    className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setEditingTitle(false)}
+                    className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <h1 className="text-2xl font-semibold text-gray-900">
+                    {getCurrentChat()?.title || 'Chat with AI'}
+                  </h1>
+                  {getCurrentChat() && (
+                    <button
+                      onClick={() => {
+                        setNewTitle(getCurrentChat()?.title || '');
+                        setEditingTitle(true);
+                      }}
+                      className="p-1 text-gray-500 hover:text-gray-700"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                      </svg>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
             <select
               value={chatState.selectedModel}
               onChange={(e) => setChatState(prev => ({ ...prev, selectedModel: e.target.value }))}
-              className="p-2 border border-gray-300 rounded-lg"
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {availableModels.map(model => (
-                <option key={model} value={model}>{model}</option>
+                <option key={model} value={model}>
+                  {model.charAt(0).toUpperCase() + model.slice(1)}
+                </option>
               ))}
             </select>
           </div>

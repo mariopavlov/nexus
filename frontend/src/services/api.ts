@@ -27,14 +27,44 @@ export class APIError extends Error {
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const error = await response.text();
-    console.error('API Error:', {
+    const errorDetails = {
       status: response.status,
       statusText: response.statusText,
-      error
-    });
-    throw new APIError(response.status, error);
+      error: error || 'Unknown error'
+    };
+    console.error('API Error:', errorDetails);
+    throw new APIError(response.status, error || response.statusText);
   }
-  return response.json();
+  const data = await response.json();
+  return data;
+}
+
+// Helper function to convert byte array to UUID string
+function bytesToUUID(bytes: number[]): string {
+  if (!bytes || bytes.length !== 16) {
+    throw new Error('Invalid byte array for UUID');
+  }
+  
+  const byteToHex: string[] = [];
+  for (let i = 0; i < 16; i++) {
+    byteToHex.push((bytes[i] + 0x100).toString(16).slice(1));
+  }
+
+  return [
+    byteToHex.slice(0, 4).join(''),
+    byteToHex.slice(4, 6).join(''),
+    byteToHex.slice(6, 8).join(''),
+    byteToHex.slice(8, 10).join(''),
+    byteToHex.slice(10, 16).join('')
+  ].join('-');
+}
+
+// Helper function to get chat ID in the correct format
+function getChatIdString(chatId: string | number[]): string {
+  if (Array.isArray(chatId)) {
+    return bytesToUUID(chatId);
+  }
+  return chatId;
 }
 
 export async function createChat(title: string) {
@@ -52,10 +82,11 @@ export async function createChat(title: string) {
   }
 }
 
-export async function getChat(chatId: string) {
+export async function getChat(chatId: string | number[]) {
   try {
-    console.log('Getting chat with URL:', `${API_BASE_URL}/chats/${chatId}`);
-    const response = await fetch(`${API_BASE_URL}/chats/${chatId}`, commonFetchOptions);
+    const chatIdStr = getChatIdString(chatId);
+    console.log('Getting chat with URL:', `${API_BASE_URL}/chats/${chatIdStr}`);
+    const response = await fetch(`${API_BASE_URL}/chats/${chatIdStr}`, commonFetchOptions);
     return handleResponse(response);
   } catch (error) {
     console.error('Failed to get chat:', error);
@@ -91,10 +122,11 @@ export async function listChats(limit = 10, offset = 0) {
   }
 }
 
-export async function deleteChat(chatId: string) {
+export async function deleteChat(chatId: string | number[]) {
   try {
-    console.log('Deleting chat with URL:', `${API_BASE_URL}/chats/${chatId}`);
-    const response = await fetch(`${API_BASE_URL}/chats/${chatId}`, {
+    const chatIdStr = getChatIdString(chatId);
+    console.log('Deleting chat with URL:', `${API_BASE_URL}/chats/${chatIdStr}`);
+    const response = await fetch(`${API_BASE_URL}/chats/${chatIdStr}`, {
       ...commonFetchOptions,
       method: 'DELETE',
     });
@@ -105,10 +137,11 @@ export async function deleteChat(chatId: string) {
   }
 }
 
-export async function sendMessage(chatId: string, content: string, model: string) {
+export async function sendMessage(chatId: string | number[], content: string, model: string) {
   try {
-    console.log('Sending message with URL:', `${API_BASE_URL}/chats/${chatId}/messages`);
-    const response = await fetch(`${API_BASE_URL}/chats/${chatId}/messages`, {
+    const chatIdStr = getChatIdString(chatId);
+    console.log('Sending message with URL:', `${API_BASE_URL}/chats/${chatIdStr}/messages`);
+    const response = await fetch(`${API_BASE_URL}/chats/${chatIdStr}/messages`, {
       ...commonFetchOptions,
       method: 'POST',
       body: JSON.stringify({ content, model }),
@@ -120,11 +153,11 @@ export async function sendMessage(chatId: string, content: string, model: string
   }
 }
 
-export async function getChatMessages(chatId: string, limit = 50, offset = 0) {
+export async function getChatMessages(chatId: string | number[], limit = 50, offset = 0) {
   try {
-    console.log('Getting chat messages with URL:', `${API_BASE_URL}/chats/${chatId}/messages?limit=${limit}&offset=${offset}`);
+    const chatIdStr = getChatIdString(chatId);
     const response = await fetch(
-      `${API_BASE_URL}/chats/${chatId}/messages?limit=${limit}&offset=${offset}`,
+      `${API_BASE_URL}/chats/${chatIdStr}/messages?limit=${limit}&offset=${offset}`,
       commonFetchOptions
     );
     return handleResponse(response);
@@ -141,6 +174,31 @@ export async function listModels() {
     return handleResponse<string[]>(response);
   } catch (error) {
     console.error('Failed to list models:', error);
+    throw error;
+  }
+}
+
+export async function updateChatTitle(chatId: string | number[], title: string) {
+  try {
+    const chatIdStr = getChatIdString(chatId);
+    console.log('Updating chat title:', { chatId: chatIdStr, title, url: `${API_BASE_URL}/chats/${chatIdStr}` });
+    const response = await fetch(`${API_BASE_URL}/chats/${chatIdStr}`, {
+      ...commonFetchOptions,
+      method: 'PUT',
+      body: JSON.stringify({ title }),
+    });
+    console.log('Update response:', {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    });
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Failed to update chat title:', {
+      error,
+      message: error.message,
+      stack: error.stack,
+    });
     throw error;
   }
 }

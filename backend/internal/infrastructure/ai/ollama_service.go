@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 
@@ -31,9 +32,9 @@ func NewOllamaService(baseURL string) ports.AIModelService {
 }
 
 type ollamaRequest struct {
-	Model    string   `json:"model"`
+	Model    string    `json:"model"`
 	Messages []message `json:"messages"`
-	Stream   bool     `json:"stream"`
+	Stream   bool      `json:"stream"`
 }
 
 type message struct {
@@ -43,26 +44,42 @@ type message struct {
 
 type ollamaResponse struct {
 	Model     string `json:"model"`
-	Response  string `json:"response"`
-	Error     string `json:"error,omitempty"`
+	CreatedAt string `json:"created_at"`
+	Message   struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	} `json:"message"`
+	DoneReason string `json:"done_reason"`
+	Done       bool   `json:"done"`
+	Error      string `json:"error,omitempty"`
 }
 
-func (s *OllamaService) SendMessage(ctx context.Context, msg *domain.Message) (*domain.Message, error) {
+func (s *OllamaService) SendMessage(ctx context.Context, msg *domain.Message, history []*domain.Message) (*domain.Message, error) {
+	// Convert history to ollama messages format
+	messages := make([]message, 0, len(history)+1)
+	for _, m := range history {
+		messages = append(messages, message{
+			Role:    string(m.Role),
+			Content: m.Content,
+		})
+	}
+	messages = append(messages, message{
+		Role:    string(msg.Role),
+		Content: msg.Content,
+	})
+
 	reqBody := ollamaRequest{
-		Model: msg.Model,
-		Messages: []message{
-			{
-				Role:    string(msg.Role),
-				Content: msg.Content,
-			},
-		},
-		Stream: false,
+		Model:    msg.Model,
+		Messages: messages,
+		Stream:   false,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
+
+	fmt.Printf("Sending request to Ollama: %s\n", string(jsonBody))
 
 	req, err := http.NewRequestWithContext(ctx, "POST", s.baseURL+"/api/chat", bytes.NewBuffer(jsonBody))
 	if err != nil {
@@ -76,16 +93,28 @@ func (s *OllamaService) SendMessage(ctx context.Context, msg *domain.Message) (*
 	}
 	defer resp.Body.Close()
 
-	var ollamaResp ollamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
+	fmt.Printf("Raw Ollama response: %s\n", string(respBody))
+
+	var ollamaResp ollamaResponse
+	if err := json.Unmarshal(respBody, &ollamaResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w, body: %s", err, string(respBody))
+	}
+
+	fmt.Printf("Decoded Ollama response: %+v\n", ollamaResp)
 
 	if ollamaResp.Error != "" {
 		return nil, fmt.Errorf("ollama error: %s", ollamaResp.Error)
 	}
 
-	return domain.NewMessage(msg.ChatID, ollamaResp.Response, domain.AssistantRole, msg.Model), nil
+	if ollamaResp.Message.Content == "" {
+		return nil, fmt.Errorf("empty response content from Ollama")
+	}
+
+	return domain.NewMessage(msg.ChatID, ollamaResp.Message.Content, domain.AssistantRole, msg.Model), nil
 }
 
 func (s *OllamaService) ListAvailableModels(ctx context.Context) ([]string, error) {
