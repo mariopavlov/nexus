@@ -37,9 +37,15 @@ func (uc *chatUseCase) GetChat(ctx context.Context, id domain.ChatID) (*domain.C
 	}
 
 	// Get messages for this chat
-	messages, err := uc.chatRepo.GetMessages(ctx, id, 50, 0) // Get last 50 messages
+	messagesPtr, err := uc.chatRepo.GetMessages(ctx, id, 50, 0) // Get last 50 messages
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chat messages: %w", err)
+	}
+
+	// Convert []*domain.Message to []domain.Message
+	messages := make([]domain.Message, len(messagesPtr))
+	for i, msg := range messagesPtr {
+		messages[i] = *msg
 	}
 
 	chat.Messages = messages

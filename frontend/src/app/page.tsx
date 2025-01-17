@@ -139,6 +139,19 @@ export default function Home() {
     }
   };
 
+  const handleDeleteChat = async (chatId: string) => {
+    try {
+      await api.deleteChat(chatId);
+      setChatState(prev => ({
+        ...prev,
+        chats: prev.chats.filter(chat => chat.id !== chatId),
+        currentChatId: prev.currentChatId === chatId ? null : prev.currentChatId,
+      }));
+    } catch (error) {
+      console.error('Error deleting chat:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || chatState.isLoading || !chatState.currentChatId) return;
@@ -208,6 +221,7 @@ export default function Home() {
         currentChatId={chatState.currentChatId}
         onChatSelect={handleChatSelect}
         onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
       />
       
       <div className="flex-1 flex flex-col">

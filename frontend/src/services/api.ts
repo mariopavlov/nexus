@@ -11,6 +11,7 @@ console.log('Using hardcoded API URL:', API_BASE_URL);
 // Common fetch options
 const commonFetchOptions = {
   mode: 'cors' as RequestMode,
+  credentials: 'same-origin' as RequestCredentials,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -30,11 +31,19 @@ async function handleResponse<T>(response: Response): Promise<T> {
     const errorDetails = {
       status: response.status,
       statusText: response.statusText,
-      error: error || 'Unknown error'
+      url: response.url,
+      error: error || 'Unknown error',
+      headers: Object.fromEntries(response.headers.entries()),
     };
-    console.error('API Error:', errorDetails);
+    console.error('API Error Details:', errorDetails);
     throw new APIError(response.status, error || response.statusText);
   }
+  
+  // Return null for 204 No Content responses
+  if (response.status === 204) {
+    return null as T;
+  }
+  
   const data = await response.json();
   return data;
 }
@@ -138,14 +147,42 @@ export async function listChats(limit = 10, offset = 0) {
 export async function deleteChat(chatId: string | number[]) {
   try {
     const chatIdStr = getChatIdString(chatId);
-    console.log('Deleting chat with URL:', `${API_BASE_URL}/chats/${chatIdStr}`);
-    const response = await fetch(`${API_BASE_URL}/chats/${chatIdStr}`, {
+    const url = `${API_BASE_URL}/chats/${chatIdStr}`;
+    console.log('Deleting chat with URL:', url);
+    console.log('Request options:', {
+      method: 'DELETE',
+      headers: {
+        ...commonFetchOptions.headers,
+        'Accept': '*/*',
+      },
+      mode: commonFetchOptions.mode,
+      credentials: commonFetchOptions.credentials,
+    });
+
+    const response = await fetch(url, {
       ...commonFetchOptions,
       method: 'DELETE',
+      headers: {
+        ...commonFetchOptions.headers,
+        'Accept': '*/*',
+      },
     });
+
+    console.log('Delete response:', {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+    });
+
     return handleResponse(response);
   } catch (error) {
-    console.error('Failed to delete chat:', error);
+    console.error('Failed to delete chat. Error details:', {
+      error,
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+      cause: error.cause,
+    });
     throw error;
   }
 }

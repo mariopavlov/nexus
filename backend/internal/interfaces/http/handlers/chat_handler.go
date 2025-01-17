@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
@@ -47,32 +48,44 @@ func (h *ChatHandler) RegisterRoutes(r *gin.Engine) {
 func (h *ChatHandler) CreateChat(c *gin.Context) {
 	var req CreateChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Failed to bind JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	chat, err := h.chatUseCase.CreateChat(c.Request.Context(), req.Title)
 	if err != nil {
+		log.Printf("Failed to create chat: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("Successfully created chat with ID: %s", chat.ID)
 	c.JSON(http.StatusOK, chat)
 }
 
 func (h *ChatHandler) GetChat(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		log.Printf("Invalid chat ID format: %v, ID: %s", err, c.Param("id"))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid chat ID format",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	chat, err := h.chatUseCase.GetChat(c.Request.Context(), domain.ChatID(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to get chat: %v, ID: %s", err, id)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to get chat",
+			"details": err.Error(),
+		})
 		return
 	}
 
+	log.Printf("Successfully retrieved chat with ID: %s", id)
 	c.JSON(http.StatusOK, chat)
 }
 
@@ -85,77 +98,112 @@ func (h *ChatHandler) ListChats(c *gin.Context) {
 
 	chats, err := h.chatUseCase.ListChats(c.Request.Context(), limit, offset)
 	if err != nil {
+		log.Printf("Failed to list chats: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("Successfully listed chats")
 	c.JSON(http.StatusOK, chats)
 }
 
 func (h *ChatHandler) DeleteChat(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		log.Printf("Invalid chat ID format: %v, ID: %s", err, c.Param("id"))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid chat ID format",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	err = h.chatUseCase.DeleteChat(c.Request.Context(), domain.ChatID(id))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to delete chat: %v, ID: %s", err, id)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to delete chat",
+			"details": err.Error(),
+		})
 		return
 	}
 
+	log.Printf("Successfully deleted chat with ID: %s", id)
 	c.Status(http.StatusNoContent)
 }
 
 func (h *ChatHandler) UpdateChat(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		log.Printf("Invalid chat ID format: %v, ID: %s", err, c.Param("id"))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid chat ID format",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	var req UpdateChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Failed to bind JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	chat, err := h.chatUseCase.UpdateChat(c.Request.Context(), domain.ChatID(id), req.Title)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to update chat: %v, ID: %s", err, id)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to update chat",
+			"details": err.Error(),
+		})
 		return
 	}
 
+	log.Printf("Successfully updated chat with ID: %s", id)
 	c.JSON(http.StatusOK, chat)
 }
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		log.Printf("Invalid chat ID format: %v, ID: %s", err, c.Param("id"))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid chat ID format",
+			"details": err.Error(),
+		})
 		return
 	}
 
 	var req SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Printf("Failed to bind JSON: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	message, err := h.chatUseCase.SendMessage(c.Request.Context(), domain.ChatID(id), req.Content, req.Model)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to send message: %v, ID: %s", err, id)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to send message",
+			"details": err.Error(),
+		})
 		return
 	}
 
+	log.Printf("Successfully sent message with ID: %s", id)
 	c.JSON(http.StatusOK, message)
 }
 
 func (h *ChatHandler) GetMessages(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		log.Printf("Invalid chat ID format: %v, ID: %s", err, c.Param("id"))
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid chat ID format",
+			"details": err.Error(),
+		})
 		return
 	}
 
@@ -167,19 +215,26 @@ func (h *ChatHandler) GetMessages(c *gin.Context) {
 
 	messages, err := h.chatUseCase.GetChatHistory(c.Request.Context(), domain.ChatID(id), limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		log.Printf("Failed to get messages: %v, ID: %s", err, id)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to get messages",
+			"details": err.Error(),
+		})
 		return
 	}
 
+	log.Printf("Successfully retrieved messages with ID: %s", id)
 	c.JSON(http.StatusOK, messages)
 }
 
 func (h *ChatHandler) ListModels(c *gin.Context) {
 	models, err := h.chatUseCase.ListAvailableModels(c.Request.Context())
 	if err != nil {
+		log.Printf("Failed to list models: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
+	log.Printf("Successfully listed models")
 	c.JSON(http.StatusOK, models)
 }
