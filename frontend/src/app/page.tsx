@@ -4,14 +4,17 @@ import { useState, useRef, useEffect } from 'react';
 import { Message, ChatState, Chat } from '@/types/chat';
 import ChatMessage from '@/components/ChatMessage';
 import ChatSidebar from '@/components/ChatSidebar';
+import * as api from '@/services/api';
 
 export default function Home() {
   const [chatState, setChatState] = useState<ChatState>({
     chats: [],
     currentChatId: null,
     isLoading: false,
+    selectedModel: 'llama2',
   });
   const [input, setInput] = useState('');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const getCurrentChat = () => {
@@ -28,20 +31,93 @@ export default function Home() {
     scrollToBottom();
   }, [chatState.chats, chatState.currentChatId]);
 
-  const handleNewChat = () => {
-    const newChat: Chat = {
-      id: Date.now().toString(),
-      title: 'New Chat',
-      messages: [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+  // Load chats and models on mount
+  useEffect(() => {
+    const loadInitialData = async () => {
+      try {
+        // Test API connectivity first
+        console.log('Testing API connectivity...');
+        const testResponse = await fetch('http://localhost:8080/chats', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          }
+        }).catch(error => {
+          console.error('API connectivity test failed:', {
+            name: error.name,
+            message: error.message,
+            cause: error.cause,
+            stack: error.stack,
+            toString: error.toString()
+          });
+          throw error;
+        });
 
-    setChatState(prev => ({
-      ...prev,
-      chats: [newChat, ...prev.chats],
-      currentChatId: newChat.id,
-    }));
+        console.log('API test response:', {
+          status: testResponse.status,
+          ok: testResponse.ok,
+          statusText: testResponse.statusText,
+          headers: Object.fromEntries(testResponse.headers.entries())
+        });
+
+        console.log('Starting to load chats and models...');
+        const [chatsResponse, models] = await Promise.all([
+          api.listChats().catch(error => {
+            console.error('Failed to load chats:', {
+              name: error.name,
+              message: error.message,
+              cause: error.cause,
+              stack: error.stack
+            });
+            return [];
+          }),
+          api.listModels().catch(error => {
+            console.error('Failed to load models:', {
+              name: error.name,
+              message: error.message,
+              cause: error.cause,
+              stack: error.stack
+            });
+            return [];
+          }),
+        ]);
+
+        console.log('Received responses:', { chatsResponse, models });
+
+        const chats = chatsResponse || [];
+        setChatState(prev => ({
+          ...prev,
+          chats: chats,
+          currentChatId: chats?.length > 0 ? chats[0].id : null,
+        }));
+        if (Array.isArray(models) && models.length > 0) {
+          setAvailableModels(models);
+          setChatState(prev => ({ ...prev, selectedModel: models[0] }));
+        }
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+        setChatState(prev => ({
+          ...prev,
+          chats: [],
+          currentChatId: null,
+        }));
+        setAvailableModels([]);
+      }
+    };
+    loadInitialData();
+  }, []);
+
+  const handleNewChat = async () => {
+    try {
+      const newChat = await api.createChat('New Chat');
+      setChatState(prev => ({
+        ...prev,
+        chats: [newChat, ...prev.chats],
+        currentChatId: newChat.id,
+      }));
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+    }
   };
 
   const handleChatSelect = (chatId: string) => {
@@ -58,48 +134,26 @@ export default function Home() {
     const currentChat = getCurrentChat();
     if (!currentChat) return;
 
-    const newMessage: Message = { role: 'user', content: input };
-    
-    setChatState(prev => ({
-      ...prev,
-      chats: prev.chats.map(chat => 
-        chat.id === prev.currentChatId
-          ? {
-              ...chat,
-              messages: [...chat.messages, newMessage],
-              updatedAt: new Date().toISOString(),
-            }
-          : chat
-      ),
-      isLoading: true,
-    }));
+    setChatState(prev => ({ ...prev, isLoading: true }));
     setInput('');
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...currentChat.messages, newMessage] }),
-      });
+      const message = await api.sendMessage(
+        chatState.currentChatId,
+        input,
+        chatState.selectedModel
+      );
 
-      const data = await response.json();
+      // Refresh the chat to get the latest messages
+      const updatedChat = await api.getChat(chatState.currentChatId);
       
-      if (data.message) {
-        setChatState(prev => ({
-          ...prev,
-          chats: prev.chats.map(chat =>
-            chat.id === prev.currentChatId
-              ? {
-                  ...chat,
-                  messages: [...chat.messages, data.message],
-                  title: chat.messages.length === 0 ? data.message.content.slice(0, 30) + '...' : chat.title,
-                  updatedAt: new Date().toISOString(),
-                }
-              : chat
-          ),
-          isLoading: false,
-        }));
-      }
+      setChatState(prev => ({
+        ...prev,
+        chats: prev.chats.map(chat =>
+          chat.id === prev.currentChatId ? updatedChat : chat
+        ),
+        isLoading: false,
+      }));
     } catch (error) {
       console.error('Error:', error);
       setChatState(prev => ({ ...prev, isLoading: false }));
@@ -117,7 +171,18 @@ export default function Home() {
       
       <div className="flex-1 flex flex-col">
         <header className="p-4 bg-white border-b border-gray-200">
-          <h1 className="text-2xl font-semibold text-center text-gray-900">Chat with Phi</h1>
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-semibold text-gray-900">Chat with AI</h1>
+            <select
+              value={chatState.selectedModel}
+              onChange={(e) => setChatState(prev => ({ ...prev, selectedModel: e.target.value }))}
+              className="p-2 border border-gray-300 rounded-lg"
+            >
+              {availableModels.map(model => (
+                <option key={model} value={model}>{model}</option>
+              ))}
+            </select>
+          </div>
         </header>
         
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
