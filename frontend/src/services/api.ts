@@ -75,7 +75,12 @@ export async function createChat(title: string) {
       method: 'POST',
       body: JSON.stringify({ title }),
     });
-    return handleResponse(response);
+    const chat = await handleResponse<any>(response);
+    return {
+      ...chat,
+      id: Array.isArray(chat.id) ? bytesToUUID(chat.id) : chat.id,
+      messages: []
+    };
   } catch (error) {
     console.error('Failed to create chat:', error);
     throw error;
@@ -87,7 +92,17 @@ export async function getChat(chatId: string | number[]) {
     const chatIdStr = getChatIdString(chatId);
     console.log('Getting chat with URL:', `${API_BASE_URL}/chats/${chatIdStr}`);
     const response = await fetch(`${API_BASE_URL}/chats/${chatIdStr}`, commonFetchOptions);
-    return handleResponse(response);
+    const chat = await handleResponse<any>(response);
+    
+    return {
+      ...chat,
+      id: Array.isArray(chat.id) ? bytesToUUID(chat.id) : chat.id,
+      messages: (chat.messages || []).map((msg: any) => ({
+        ...msg,
+        id: Array.isArray(msg.id) ? bytesToUUID(msg.id) : msg.id,
+        chat_id: Array.isArray(msg.chat_id) ? bytesToUUID(msg.chat_id) : msg.chat_id,
+      }))
+    };
   } catch (error) {
     console.error('Failed to get chat:', error);
     throw error;
@@ -103,21 +118,19 @@ export async function listChats(limit = 10, offset = 0) {
       `${API_BASE_URL}/chats?limit=${limit}&offset=${offset}`,
       commonFetchOptions
     );
-    return handleResponse(response);
+
+    const chats = await handleResponse<any[]>(response);
+    return chats.map(chat => ({
+      ...chat,
+      id: Array.isArray(chat.id) ? bytesToUUID(chat.id) : chat.id,
+      messages: (chat.messages || []).map((msg: any) => ({
+        ...msg,
+        id: Array.isArray(msg.id) ? bytesToUUID(msg.id) : msg.id,
+        chat_id: Array.isArray(msg.chat_id) ? bytesToUUID(msg.chat_id) : msg.chat_id,
+      }))
+    }));
   } catch (error) {
-    // Log detailed error information
-    console.error('Failed to list chats. Error details:', {
-      name: error.name,
-      message: error.message,
-      cause: error.cause,
-      stack: error.stack,
-      toString: error.toString(),
-      // If it's a TypeError, log additional properties
-      ...(error instanceof TypeError && {
-        type: 'TypeError',
-        fullDetails: error
-      })
-    });
+    console.error('Failed to list chats:', error);
     throw error;
   }
 }
@@ -146,7 +159,12 @@ export async function sendMessage(chatId: string | number[], content: string, mo
       method: 'POST',
       body: JSON.stringify({ content, model }),
     });
-    return handleResponse(response);
+    const message = await handleResponse<any>(response);
+    return {
+      ...message,
+      id: Array.isArray(message.id) ? bytesToUUID(message.id) : message.id,
+      chat_id: Array.isArray(message.chat_id) ? bytesToUUID(message.chat_id) : message.chat_id,
+    };
   } catch (error) {
     console.error('Failed to send message:', error);
     throw error;

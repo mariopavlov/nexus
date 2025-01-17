@@ -150,13 +150,14 @@ export default function Home() {
     setInput('');
 
     try {
+      // Send the message
       const message = await api.sendMessage(
         chatState.currentChatId,
         input,
         chatState.selectedModel
       );
 
-      // Refresh the chat to get the latest messages
+      // Get the updated chat with all messages
       const updatedChat = await api.getChat(chatState.currentChatId);
       
       setChatState(prev => ({
@@ -167,7 +168,7 @@ export default function Home() {
         isLoading: false,
       }));
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error sending message:', error);
       setChatState(prev => ({ ...prev, isLoading: false }));
     }
   };
