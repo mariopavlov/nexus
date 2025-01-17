@@ -186,7 +186,7 @@ export default function Home() {
         </header>
         
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          {getCurrentChat()?.messages.map((message, index) => (
+          {getCurrentChat()?.messages?.map((message, index) => (
             <ChatMessage key={index} message={message} />
           ))}
           {chatState.isLoading && (
