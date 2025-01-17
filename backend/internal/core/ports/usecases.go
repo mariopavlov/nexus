@@ -9,6 +9,7 @@ import (
 type ChatUseCase interface {
 	CreateChat(ctx context.Context, title string) (*domain.Chat, error)
 	GetChat(ctx context.Context, id domain.ChatID) (*domain.Chat, error)
+	UpdateChat(ctx context.Context, id domain.ChatID, title string) (*domain.Chat, error)
 	ListChats(ctx context.Context, limit, offset int) ([]*domain.Chat, error)
 	DeleteChat(ctx context.Context, id domain.ChatID) error
 	SendMessage(ctx context.Context, chatID domain.ChatID, content string, model string) (*domain.Message, error)
