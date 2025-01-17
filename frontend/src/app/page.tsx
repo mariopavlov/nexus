@@ -220,7 +220,7 @@ export default function Home() {
                     type="text"
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="px-2 py-1 border border-gray-300 rounded"
+                    className="px-2 py-1 border border-gray-300 rounded text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     autoFocus
                   />
                   <button
@@ -260,7 +260,7 @@ export default function Home() {
             <select
               value={chatState.selectedModel}
               onChange={(e) => setChatState(prev => ({ ...prev, selectedModel: e.target.value }))}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-white shadow-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
               {availableModels.map(model => (
                 <option key={model} value={model}>
