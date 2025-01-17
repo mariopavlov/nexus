@@ -20,7 +20,7 @@ func NewChat(title string) *Chat {
 	now := time.Now()
 
 	return &Chat{
-		ID:        ChatID{uuid.New()},
+		ID:        ChatID(uuid.New()),
 		Title:     title,
 		CreatedAt: now,
 		UpdatedAt: now,
