@@ -12,7 +12,7 @@ export default function ChatMessage({ message }: { message: Message }) {
       } mb-6`}
     >
       <div
-        className={`max-w-[80%] rounded-lg p-4 shadow-sm ${
+        className={`max-w-[80%] rounded-lg p-4 shadow-sm space-y-4 ${
           message.role === 'user'
             ? 'bg-blue-600 text-white'
             : 'bg-white text-gray-900 border border-gray-200'
@@ -22,22 +22,34 @@ export default function ChatMessage({ message }: { message: Message }) {
           remarkPlugins={[remarkGfm]}
           components={{
             code({ node, inline, className, children, ...props }) {
+              // For inline code, return the original text
               if (inline) {
-                return <code className="bg-gray-100 text-gray-900 px-1 py-0.5 rounded" {...props}>{children}</code>;
+                return <span className="bg-black text-white font-bold italic px-1 py-0.5 rounded">{"{"}{children}{"}"}</span>;
               }
+
               const match = /language-(\w+)/.exec(className || '');
               const language = match ? match[1] : '';
-              return (
-                <CodeBlock
-                  language={language}
-                  value={String(children).replace(/\n$/, '')}
-                />
-              );
-            }
+              const codeContent = String(children).replace(/\n$/, '');
+
+              // Only use CodeBlock for multiline code
+              if (codeContent.includes('\n')) {
+                return (
+                  <CodeBlock
+                    language={language}
+                    value={codeContent}
+                  />
+                );
+              }
+
+              // For single line code, return the original text
+              return <>{children}</>;
+            },
+            // Ensure pre elements are rendered properly
+            pre: ({ children }) => children
           }}
           className="prose max-w-none text-inherit prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit"
         >
-          {typeof message.content === 'string' ? message.content : String(message.content)}
+          {message.content}
         </ReactMarkdown>
       </div>
     </div>
