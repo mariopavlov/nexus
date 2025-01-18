@@ -1,6 +1,8 @@
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Message } from '@/types/chat';
+import CodeBlock from './CodeBlock';
 
 export default function ChatMessage({ message }: { message: Message }) {
   return (
@@ -18,7 +20,22 @@ export default function ChatMessage({ message }: { message: Message }) {
       >
         <ReactMarkdown 
           remarkPlugins={[remarkGfm]}
-          className="prose max-w-none text-inherit prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit prose-code:bg-gray-100 prose-code:text-gray-900 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-pre:bg-gray-100 prose-pre:text-gray-900"
+          components={{
+            code({ node, inline, className, children, ...props }) {
+              if (inline) {
+                return <code className="bg-gray-100 text-gray-900 px-1 py-0.5 rounded" {...props}>{children}</code>;
+              }
+              const match = /language-(\w+)/.exec(className || '');
+              const language = match ? match[1] : '';
+              return (
+                <CodeBlock
+                  language={language}
+                  value={String(children).replace(/\n$/, '')}
+                />
+              );
+            }
+          }}
+          className="prose max-w-none text-inherit prose-headings:text-inherit prose-p:text-inherit prose-strong:text-inherit"
         >
           {typeof message.content === 'string' ? message.content : String(message.content)}
         </ReactMarkdown>
