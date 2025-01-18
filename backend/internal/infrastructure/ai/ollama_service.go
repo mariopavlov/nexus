@@ -56,7 +56,25 @@ type ollamaResponse struct {
 
 func (s *OllamaService) SendMessage(ctx context.Context, msg *domain.Message, history []*domain.Message) (*domain.Message, error) {
 	// Convert history to ollama messages format
-	messages := make([]message, 0, len(history)+1)
+	messages := make([]message, 0, len(history)+2) // +2 for system message and current message
+	
+	// Add system message with formatting instructions
+
+	systemMessage := message{
+        Role: "system",
+        Content: `You are a helpful AI assistant. Please follow these guidelines:
+				- Use clear and concise language
+				- When sharing code, use proper markdown formatting:
+				- Inline code with single backticks: ` + "`code`" + `
+				- Code blocks with triple backticks and language: ` + "```language" + `
+				- Provide context-aware responses
+				- Maintain consistency in formatting
+				- Never use HTML tags for code formatting
+				- Always validate inputs and provide appropriate error messages`,
+    }
+
+	messages = append(messages, systemMessage)
+
 	for _, m := range history {
 		messages = append(messages, message{
 			Role:    string(m.Role),
