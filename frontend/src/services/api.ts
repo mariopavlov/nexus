@@ -129,6 +129,7 @@ export async function listChats(limit = 10, offset = 0) {
     );
 
     const chats = await handleResponse<any[]>(response);
+    if (!chats) return [];
     return chats.map(chat => ({
       ...chat,
       id: Array.isArray(chat.id) ? bytesToUUID(chat.id) : chat.id,
